@@ -14,20 +14,21 @@ library(plyr)
 source("utils.R")
 
 
-# # Check out list of CRS
+# --- Check out list of Coordinate Reference Systems (CRS)
 # EPSG <- make_EPSG() # create data frame of available EPSG codes 
 # EPSG[grepl("WGS 84$", EPSG$note), ] # search for WGS 84 code
 # tmp <- EPSG[grepl("UTM", EPSG$note), ] # search for WGS 84 code
 
 
-# # Look up proj.4 strings for different projections
+# --- Look up proj.4 strings for different projections
 # EPSG <- make_EPSG()
 # EPSG[grep("1903", EPSG$note, ignore.case=TRUE), 1:2]
 
-# Train station data location
+
+# Location of train station data
 data.dir <- 'haltestellen-offentl-verk/'
 
-# Shape file location of administrative regions in CH
+# Location of shape file of administrative regions in CH
 shp.dir <- 'admin-regions/gis-data/'
 
 
@@ -35,6 +36,8 @@ shp.dir <- 'admin-regions/gis-data/'
 out.dir <- './maps/'
 dir.create(out.dir,showWarnings = FALSE)
 
+
+# LOAD GEOGRAPHIC POLYGONS
 
 # Read shapefile (G3G09 for Gemeinden, G3B09 for Bezirke), this should be stored
 # in the CH1903 projection already
@@ -47,14 +50,13 @@ chmap@data$id <- rownames(chmap@data)
 # Add area of each polygons to SP data frame
 chmap@data$Area <- gArea(chmap,byid=TRUE)/1e6
 
-# Load Kanton boundaries, to be used for plotting later
+# Load Kanton boundaries, to be used for second layer of plotting later
 chmapK <- readOGR(dsn=shp.dir, layer="G3K09")
 chmapK@data$id <- rownames(chmapK@data)
 
 
-# Try to reproject to Swissgrid (which does not seem to be the CH1903 system)
-# chmap_ch1903 <- spTransform(chmap, CRS("+proj=somerc +lat_0=46.95240555555556 +lon_0=7.439583333333333 +k_0=1 +x_0=2600000 +y_0=1200000 +ellps=bessel +towgs84=674.374,15.056,405.346,0,0,0,0 +units=m +no_defs"))
 
+# PREPARE TRAIN STATION DENSITY DATA
 
 # Read public transit stations CSV file (presumably in swiss grid coordinate
 # system)
@@ -66,7 +68,6 @@ dat <- read.csv(paste(data.dir,fname,sep=''),sep=',')
 xy <- dat[,c('y_Coord_Est','x_Coord_Nord')]
 proj4str <- proj4string(chmap)
 stations.spdf <- SpatialPointsDataFrame(coords = xy, data = dat, proj4string = CRS(proj4str))
-
 
 # Count number of stations in each polygon. This solution is very condensed and
 # uses an aggregation by polygons in 'chmap'
@@ -83,7 +84,7 @@ chmap$StatDens <- chmap@data$Nstations / chmap@data$Area
 # ggsave(paste(out.dir,"Haltestellendichte",'.pdf',sep=''),plot=p,units = 'cm',width = 18,height = 8) 
 
 
-# Prepare the map for plotting by ggplot2
+# Turn 'champ" to dataframe for plotting by ggplot2
 chmap.df <- fortify(chmap)
 chmap.df <- merge(chmap.df,chmap@data,by='id')
 
