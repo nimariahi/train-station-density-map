@@ -10,8 +10,6 @@ library(rgdal)
 library(rgeos)  # To compute areas
 library(ggplot2)
 library(plyr)
-# library(maptools)
-# library(utils)
 
 source("utils.R")
 
@@ -33,22 +31,20 @@ data.dir <- 'haltestellen-offentl-verk/'
 shp.dir <- 'admin-regions/gis-data/'
 
 
-# Directory to put maps
+# Directory to put maps in
 out.dir <- './maps/'
 dir.create(out.dir,showWarnings = FALSE)
 
 
-
-
-
-# Read shapefile (G3G09 for Gemeinden, G3B09 for Bezirke), this should be stored in CH1903 grid already
+# Read shapefile (G3G09 for Gemeinden, G3B09 for Bezirke), this should be stored
+# in the CH1903 projection already
 groupname <- 'KURZ' # For cantons
 chmap <- readOGR(dsn=shp.dir, layer="G3B09")
 
 # Add a new column termed "id" composed of the rownames of data
 chmap@data$id <- rownames(chmap@data)
 
-## Add area of each polygon to SP data frame
+# Add area of each polygons to SP data frame
 chmap@data$Area <- gArea(chmap,byid=TRUE)/1e6
 
 # Load Kanton boundaries, to be used for plotting later
@@ -65,8 +61,8 @@ chmapK@data$id <- rownames(chmapK@data)
 fname <- 'PointExploitation.csv'  # Filename of public transit stations
 dat <- read.csv(paste(data.dir,fname,sep=''),sep=',')
 
-# Create a SpatialPointsDataFrame object from station locations (projected
-# coordinate object)
+# Create a SpatialPointsDataFrame object from station locations and project to
+# same coordiante system as the polygons
 xy <- dat[,c('y_Coord_Est','x_Coord_Nord')]
 proj4str <- proj4string(chmap)
 stations.spdf <- SpatialPointsDataFrame(coords = xy, data = dat, proj4string = CRS(proj4str))
@@ -87,11 +83,12 @@ chmap$StatDens <- chmap@data$Nstations / chmap@data$Area
 # ggsave(paste(out.dir,"Haltestellendichte",'.pdf',sep=''),plot=p,units = 'cm',width = 18,height = 8) 
 
 
-# Prepare the map for usage by ggplot2
-chmap_df <- fortify(chmap)
-chmap_df <- merge(chmap_df,chmap@data,by='id')
+# Prepare the map for plotting by ggplot2
+chmap.df <- fortify(chmap)
+chmap.df <- merge(chmap.df,chmap@data,by='id')
 
-chmap_df <- chmap_df[!is.na(chmap_df),]
+# Remove NA entries
+chmap.df <- chmap.df[!is.na(chmap.df),]
 
 # Do the same for the Kanton boundaries
 chmapK.df <- fortify(chmapK)
@@ -99,23 +96,23 @@ chmapK.df <- merge(chmapK.df,chmapK@data,by='id')
 
 
 # Create a quantized colorscale
-out <- quantileQuantize(chmap_df$StatDens)
+out <- quantileQuantize(chmap.df$StatDens)
 
 # Save quantized values as factors
-chmap_df$densQ <- factor(out$qvals)
+chmap.df$densQ <- factor(out$qvals)
 
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
 # Plot cantons, stations, and canton fill with Nstations
 p2 <- ggplot()
-p2 <- p2 + geom_polygon(data=chmap_df,aes(x=long/1000,y=lat/1000,group=group,fill=densQ),colour='white',linetype=1,size=0.25)
+p2 <- p2 + geom_polygon(data=chmap.df,aes(x=long/1000,y=lat/1000,group=group,fill=densQ),colour='white',linetype=1,size=0.25)
 p2 <- p2 + geom_polygon(data=chmapK.df,aes(x=long/1000,y=lat/1000,group=group),colour='white',linetype=1,size=1,alpha=0.2)
 # geom_point(data=dat,aes(x=y_Coord_Est,y=x_Coord_Nord),size=0.005)
 p2 <- p2 + coord_equal() +
   # scale_x_continuous(breaks=seq(500000,800000,50000)) +
   # scale_y_continuous(breaks=seq(100000,300000,50000)) +
-  # scale_fill_discrete(name='[/km^2]',breaks=levels(chmap_df$densQ),labels=out$LabelStr)
-  scale_fill_manual(name='[/km^2]',values=cbPalette,breaks=levels(chmap_df$densQ),labels=out$LabelStr)
+  # scale_fill_discrete(name='[/km^2]',breaks=levels(chmap.df$densQ),labels=out$LabelStr)
+  scale_fill_manual(name='[/km^2]',values=cbPalette,breaks=levels(chmap.df$densQ),labels=out$LabelStr)
   # scale_fill_distiller(guide='legend',palette = "Spectral")
   # scale_fill_distiller(guide='legend',name='Stationsdichte')
 p2 <- p2 + ggtitle('Haltestellendichte CH') +
