@@ -13,47 +13,7 @@ library(plyr)
 # library(maptools)
 # library(utils)
 
-#' 
-#' Quantize values based on percentile thresholds
-#' 
-#' This can be used to quantize a list of continuous values, e.g. to reduce the 
-#' number of levels for mapping.
-#' 
-#' @param vals A list/vector of numeric values
-#' @param ths Percentile thresholds defining quantization levels.
-#'   
-#' @return Named list, where \code{$qvals} are the quantized values, 
-#'   \code{limits} are the quantization limits, and \code{LabelStr} is a string
-#'   describing the quantizatio ranges (useful to label a colorbar).
-#'   
-#'   
-quantileQuantize <- function(vals,ths=c(0,0.25,.5,.75,1)){
-  
-  # Create field with percentile entries
-  qs <- quantile(vals,ths,na.rm=T)
-  
-  densQ <- vals
-  
-  for (i in 1:length(qs)-1){
-    sel <- vals>=qs[i] & vals<qs[i+1]
-    densQ[sel] <- i
-  }
-  densQ[vals>=qs[length(qs)]] = length(qs)-1
-  
-  qs <- as.numeric(qs)
-  Q <- (cbind(qs[1:length(qs)-1],qs[2:length(qs)]))
-  
-  # Given a 2-el numeric vector return a dash-separated string with the two numbers
-  a.lab <- function(a,fmt='%f') {
-    fmt_ <- sprintf('%s-%s',fmt,fmt)
-    sprintf(fmt_,a[1],a[2])
-  }
-  
-  label.str <- apply(Q,1,a.lab,'%04.2f')
-
-  return(list('qvals'=densQ,'limits'=cbind(ths[1:length(ths)-1],ths[2:length(ths)]),'LabelStr'=label.str))
-  
-}
+source("utils.R")
 
 
 # # Check out list of CRS
@@ -66,17 +26,19 @@ quantileQuantize <- function(vals,ths=c(0,0.25,.5,.75,1)){
 # EPSG <- make_EPSG()
 # EPSG[grep("1903", EPSG$note, ignore.case=TRUE), 1:2]
 
+# Train station data location
+data.dir <- 'haltestellen-offentl-verk/'
 
-data.dir <- 'HST_MGMD_2015-12-13/'
+# Shape file location of administrative regions in CH
+shp.dir <- 'admin-regions/gis-data/'
 
+
+# Directory to put maps
 out.dir <- './maps/'
 dir.create(out.dir,showWarnings = FALSE)
 
-# Filename of public transit stations
-fname <- 'PointExploitation.csv'
 
-# Shape file location of administrative regions in CH
-shp.dir <- 'g3g09_shp_090626/'
+
 
 
 # Read shapefile (G3G09 for Gemeinden, G3B09 for Bezirke), this should be stored in CH1903 grid already
@@ -98,17 +60,20 @@ chmapK@data$id <- rownames(chmapK@data)
 # chmap_ch1903 <- spTransform(chmap, CRS("+proj=somerc +lat_0=46.95240555555556 +lon_0=7.439583333333333 +k_0=1 +x_0=2600000 +y_0=1200000 +ellps=bessel +towgs84=674.374,15.056,405.346,0,0,0,0 +units=m +no_defs"))
 
 
-# Read public transit stations CSV file (presumably in swiss grid coordinate system)
+# Read public transit stations CSV file (presumably in swiss grid coordinate
+# system)
+fname <- 'PointExploitation.csv'  # Filename of public transit stations
 dat <- read.csv(paste(data.dir,fname,sep=''),sep=',')
 
-# Create a SpatialPointsDataFrame object from station locations (projected coordinate object)
+# Create a SpatialPointsDataFrame object from station locations (projected
+# coordinate object)
 xy <- dat[,c('y_Coord_Est','x_Coord_Nord')]
 proj4str <- proj4string(chmap)
 stations.spdf <- SpatialPointsDataFrame(coords = xy, data = dat, proj4string = CRS(proj4str))
 
 
-# Count number of stations in each polygon
-# This solution is very condensed and uses an aggregation by polygons in 'chmap'
+# Count number of stations in each polygon. This solution is very condensed and
+# uses an aggregation by polygons in 'chmap'
 chmap$Nstations <- aggregate(x=stations.spdf["Nom"],by=chmap,FUN=length)$Nom
 
 # Compute station density
@@ -161,10 +126,7 @@ p2 <- p2 + theme(
   axis.title.y=element_text(size=14,face='bold')
 )
 
-ggsave(paste(out.dir,"ch-map-ggplot.pdf",sep=''), width=12.5, height=8.25, dpi=72) 
-
-
-
+ggsave(paste(out.dir,"station-density-ch-map.pdf",sep=''), width=12.5, height=8.25, dpi=72) 
 
 
 
